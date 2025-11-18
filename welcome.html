@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Bienvenido</title>
+</head>
+<body>
+
+    <h2>Pantalla de Bienvenida</h2>
+
+    <div id="content"></div>
+
+    <button onclick="logout()">Cerrar sesión</button>
+
+    <script>
+        async function cargarDatos() {
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                window.location.href = "nopermisos.html";
+                return;
+            }
+
+            const response = await fetch("api/welcome.php", {
+                headers: {
+                    "Authorization": "Bearer " + token
+                }
+            });
+
+            if (!response.ok) {
+                window.location.href = "nopermisos.html";
+                return;
+            }
+
+            const data = await response.json();
+            document.getElementById("content").innerHTML = `
+                <p><strong>Usuario:</strong> ${data.usuario}</p>
+                <p><strong>Hora actual:</strong> ${data.hora}</p>
+                <p>${data.mensaje}</p>
+            `;
+        }
+
+        cargarDatos();
+
+        function logout() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            window.location.href = "login.html";
+        }
+    </script>
+</body>
+</html>
