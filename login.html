@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>1. Pantalla de Login</title>
+</head>
+<body>
+    <h1>Iniciar Sesión (API REST JWT)</h1>
+    <form id="loginForm">
+        <label for="username">Nombre de usuario:</label>
+        <input type="text" id="username" name="username" required value="admin"><br><br>
+        
+        <label for="password">Contraseña:</label>
+        <input type="password" id="password" name="password" required value="1234"><br><br>
+        
+        <button type="submit">Entrar</button>
+    </form>
+    <p id="message" style="color: red; font-weight: bold;"></p>
+    <!-- JavaScript para manejar el login -->
+    <script>
+        // Si ya existe un token, redirigir inmediatamente a la página protegida
+        if (localStorage.getItem('authToken')) {
+            //Si tiene la llave te lleva a  la página de bienvenida
+            window.location.href = 'welcome.html';
+        }
+        //Cuando el usuario le da a Entrar
+        document.getElementById('loginForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const messageElement = document.getElementById('message');
+            messageElement.textContent = ''; 
+            //borra elementos de clases anteriores
+            // Llama al php para pedir la llave
+            fetch('api.php/api/login', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            })
+            .then(response => {
+                //Revisa la respuesta del php
+                if (!response.ok) { 
+                    // Leer el mensaje de error JSON del servidor
+                    return response.json().then(err => { 
+                        throw new Error(err.message || 'Error desconocido.'); 
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // guarda la llave
+                localStorage.setItem('authToken', data.token); 
+                // lleva a la sala de bienvenida
+                window.location.href = 'welcome.html';
+            })
+            .catch(error => {
+                // Muestra el mensaje de error
+                messageElement.textContent = `Error de Login: ${error.message}`;
+                console.error('Login error:', error);
+            });
+        });
+    </script>
+</body>
+</html>
+</body>
+</html>

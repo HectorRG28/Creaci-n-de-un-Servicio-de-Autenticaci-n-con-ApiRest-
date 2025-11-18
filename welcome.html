@@ -2,51 +2,63 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Bienvenido</title>
+    <title>3. Pantalla de Bienvenida</title>
 </head>
 <body>
-
-    <h2>Pantalla de Bienvenida</h2>
-
-    <div id="content"></div>
-
-    <button onclick="logout()">Cerrar sesión</button>
+    <h1>Bienvenido al Sistema</h1>
+    <h2 id="welcomeHeader">Cargando datos de usuario...</h2>
+    <p>Hora de acceso: <span id="timeInfo"></span></p>
+    <p><strong id="welcomeMessage"></strong></p>
+    
+    <hr>
+    
+    <button id="logoutButton">Cerrar Sesión</button>
 
     <script>
-        async function cargarDatos() {
-            const token = localStorage.getItem("token");
+        //Llave secreta del alamacenamiento
+        const token = localStorage.getItem('authToken');
 
-            if (!token) {
-                window.location.href = "nopermisos.html";
-                return;
+        // Si la llave no es correcta, redirige al login
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+
+        //Llama al php para pedir los datos de bienvenida
+        fetch('api.php/api/welcome', {
+            method: 'GET', //Le dice al php que va a pedir los datos
+            headers: {
+                // Le muestra la llave al php en la solicitud
+                'Authorization': `Bearer ${token}` 
             }
-
-            const response = await fetch("api/welcome.php", {
-                headers: {
-                    "Authorization": "Bearer " + token
-                }
-            });
-
+        })
+        .then(response => {
+            // **3. Redirección si hay error 401 o 403 (Requisito)**
+            if (response.status === 403 || response.status === 401) {
+                localStorage.removeItem('authToken'); // Eliminar token inválido
+                window.location.href = 'no_permisos.html'; // Redirigir a "No Permisos"
+                throw new Error("Acceso denegado o token inválido");
+            }
             if (!response.ok) {
-                window.location.href = "nopermisos.html";
-                return;
+                throw new Error('Error al obtener datos del servidor.');
             }
+            return response.json();
+        })
+        .then(data => {
+            // **4. Mostrar datos personalizados (Requisito)**
+            document.getElementById('welcomeHeader').textContent = `Bienvenido, ${data.username}!`;
+            document.getElementById('timeInfo').textContent = data.time;
+            document.getElementById('welcomeMessage').textContent = data.welcome_message;
+        })
+        .catch(error => {
+            console.error('Error al cargar la bienvenida:', error);
+            document.getElementById('welcomeHeader').textContent = 'Error al cargar los datos de bienvenida. Por favor, inténtelo de nuevo.';
+        });
 
-            const data = await response.json();
-            document.getElementById("content").innerHTML = `
-                <p><strong>Usuario:</strong> ${data.usuario}</p>
-                <p><strong>Hora actual:</strong> ${data.hora}</p>
-                <p>${data.mensaje}</p>
-            `;
-        }
-
-        cargarDatos();
-
-        function logout() {
-            localStorage.removeItem("token");
-            localStorage.removeItem("username");
-            window.location.href = "login.html";
-        }
+        // **5. Lógica para Cerrar Sesión (Requisito)**
+        document.getElementById('logoutButton').addEventListener('click', function() {
+            localStorage.removeItem('authToken'); // Elimina el token almacenado
+            window.location.href = 'login.html';  // Redirige al login
+        });
     </script>
 </body>
 </html>
