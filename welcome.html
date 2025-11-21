@@ -2,63 +2,86 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>3. Pantalla de Bienvenida</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenido</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #e8f5e9; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; margin: 0; text-align: center; }
+        .welcome-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); width: 400px; }
+        h1 { color: #28a745; }
+        p { font-size: 1.1em; color: #333; }
+        #logoutBtn { margin-top: 20px; padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        #logoutBtn:hover { background-color: #c82333; }
+        .loading { color: #007bff; }
+    </style>
 </head>
 <body>
-    <h1>Bienvenido al Sistema</h1>
-    <h2 id="welcomeHeader">Cargando datos de usuario...</h2>
-    <p>Hora de acceso: <span id="timeInfo"></span></p>
-    <p><strong id="welcomeMessage"></strong></p>
-    
-    <hr>
-    
-    <button id="logoutButton">Cerrar Sesión</button>
+    <div class="welcome-box">
+        <h1 id="welcomeMessage" class="loading">Cargando...</h1>
+        <p id="userData"></p>
+        <p id="timeData"></p>
+        <button id="logoutBtn" style="display: none;">Cerrar Sesión</button>
+    </div>
 
     <script>
-        //Llave secreta del alamacenamiento
-        const token = localStorage.getItem('authToken');
+        const API_WELCOME_URL = 'index.php/api/welcome'; // Ajusta la URL
+        const welcomeMessageElement = document.getElementById('welcomeMessage');
+        const userDataElement = document.getElementById('userData');
+        const timeDataElement = document.getElementById('timeData');
+        const logoutBtn = document.getElementById('logoutBtn');
 
-        // Si la llave no es correcta, redirige al login
-        if (!token) {
-            window.location.href = 'login.html';
+        // Función para obtener los datos del usuario usando el token
+        async function fetchUserData() {
+            const token = localStorage.getItem('auth_token');
+
+            if (!token) {
+                // Si no hay token, redirigir al login
+                window.location.href = 'login.html';
+                return;
+            }
+
+            try {
+                const response = await fetch(API_WELCOME_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}` // Enviar el token en la cabecera
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Mostrar datos del usuario
+                    welcomeMessageElement.textContent = `¡Hola, ${data.user.name}!`;
+                    welcomeMessageElement.classList.remove('loading');
+                    userDataElement.textContent = `Bienvenido/a a la aplicación. Tus datos han sido cargados con éxito.`;
+                    timeDataElement.textContent = `Hora actual en el servidor: ${data.user.current_time}`;
+                    logoutBtn.style.display = 'block';
+
+                } else if (response.status === 403) {
+                    // 403 Forbidden: Token inválido o expirado
+                    localStorage.removeItem('auth_token'); // Eliminar token
+                    window.location.href = 'no_permisos.html'; // Redirigir a sin permisos
+                } else {
+                    // Otro error (e.g., 401, aunque en este caso la API responde con 403)
+                    localStorage.removeItem('auth_token');
+                    window.location.href = 'login.html';
+                }
+            } catch (error) {
+                console.error('Error de conexión:', error);
+                welcomeMessageElement.textContent = 'Error al conectar con la API.';
+            }
         }
 
-        //Llama al php para pedir los datos de bienvenida
-        fetch('api.php/api/welcome', {
-            method: 'GET', //Le dice al php que va a pedir los datos
-            headers: {
-                // Le muestra la llave al php en la solicitud
-                'Authorization': `Bearer ${token}` 
-            }
-        })
-        .then(response => {
-            // **3. Redirección si hay error 401 o 403 (Requisito)**
-            if (response.status === 403 || response.status === 401) {
-                localStorage.removeItem('authToken'); // Eliminar token inválido
-                window.location.href = 'no_permisos.html'; // Redirigir a "No Permisos"
-                throw new Error("Acceso denegado o token inválido");
-            }
-            if (!response.ok) {
-                throw new Error('Error al obtener datos del servidor.');
-            }
-            return response.json();
-        })
-        .then(data => {
-            // **4. Mostrar datos personalizados (Requisito)**
-            document.getElementById('welcomeHeader').textContent = `Bienvenido, ${data.username}!`;
-            document.getElementById('timeInfo').textContent = data.time;
-            document.getElementById('welcomeMessage').textContent = data.welcome_message;
-        })
-        .catch(error => {
-            console.error('Error al cargar la bienvenida:', error);
-            document.getElementById('welcomeHeader').textContent = 'Error al cargar los datos de bienvenida. Por favor, inténtelo de nuevo.';
+        // Funcionalidad para cerrar sesión
+        logoutBtn.addEventListener('click', () => {
+            // Eliminar el token de localStorage
+            localStorage.removeItem('auth_token'); 
+            // Redirigir al login
+            window.location.href = 'login.html'; 
         });
 
-        // **5. Lógica para Cerrar Sesión (Requisito)**
-        document.getElementById('logoutButton').addEventListener('click', function() {
-            localStorage.removeItem('authToken'); // Elimina el token almacenado
-            window.location.href = 'login.html';  // Redirige al login
-        });
+        // Ejecutar la obtención de datos al cargar la página
+        fetchUserData();
     </script>
 </body>
 </html>

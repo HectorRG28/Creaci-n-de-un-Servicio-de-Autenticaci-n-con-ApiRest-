@@ -2,11 +2,22 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>4. Acceso Denegado</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Denegado</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #fff3f3; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; margin: 0; text-align: center; }
+        .error-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(255, 0, 0, 0.1); border: 1px solid #dc3545; }
+        h1 { color: #dc3545; font-size: 2.5em; }
+        p { font-size: 1.2em; color: #333; }
+        a { color: #007bff; text-decoration: none; margin-top: 20px; display: block; }
+        a:hover { text-decoration: underline; }
+    </style>
 </head>
 <body>
-    <h1>⚠️ Acceso Restringido</h1>
-    <p>No tienes permisos para acceder a esta página.</p>
-    <p>Asegúrate de haber iniciado sesión correctamente. <a href="login.html">Volver al Login</a></p>
+    <div class="error-box">
+        <h1>403 Prohibido</h1>
+        <p>No tienes permisos para acceder a esta página.</p>
+        <a href="login.html">Volver a la pantalla de Login</a>
+    </div>
 </body>
 </html>

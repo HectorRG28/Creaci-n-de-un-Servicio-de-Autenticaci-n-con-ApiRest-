@@ -1,128 +1,116 @@
 <?php
-//Permite que los HTML que esten en otros sitios se puedan comunicar con el back
-header("Access-Control-Allow-Origin: *"); 
-//Avisa que la rspuesta que dara es un mensaje estructurado en JSON
+// Configuración de encabezados para permitir solicitudes de cualquier origen (CORS) y JSON
+header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
-//Dice las respuestas que tipos de solicitudes acepta(enviar o pedir datos)
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-//Especifica que espere hasta que le envie la clave
+header("Access-Control-Allow-Methods: POST, GET");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-//Si le pregunta un HTML si puede enviar datos, responde que si y no mas de 200S
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
-
-//Lista de nombres y contraseña que conoce el php
+// --- SIMULACIÓN DE USUARIOS ---
 $usuarios = [
-    ["username" => "admin", "password" => "1234"],
-    ["username" => "user", "password" => "abcd"]
+    ["username" => "admin", "password" => "1234", "name" => "Administrador"],
+    ["username" => "user", "password" => "abcd", "name" => "Usuario Básico"]
 ];
-//Indica no si hay un error con el código
-function send_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(["message" => $message]);
-    exit();
-}
 
-// Herramienta para buscar el token en la cabecera Authorization
-function get_token_from_header() {
-    $headers = getallheaders();
-    if (isset($headers['Authorization'])) {
-        if (preg_match('/Bearer\s(\S+)/', $headers['Authorization'], $matches)) {
-            return $matches[1];
-        }
-    }
-    return null;
-}
+$request_method = $_SERVER["REQUEST_METHOD"];
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$path_parts = explode('/', trim($uri, '/'));
+$endpoint = end($path_parts);
 
-//¿Que le piden al php?
-$request_uri = $_SERVER['REQUEST_URI'];
+// ===============================================
+// ENDPOINT: /api/login (POST)
+// ===============================================
+if ($endpoint === 'login' && $request_method === 'POST') {
+    $data = json_decode(file_get_contents("php://input"));
 
-//Si la página le pide entrar
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && strpos($request_uri, '/api/login') !== false) {
-    //Lee el nombre y contraseña que envió la recepción
-    $data = json_decode(file_get_contents("php://input"), true);
-    $username = $data['username'] ?? '';
-    $password = $data['password'] ?? '';
-    $authenticated = false;
-    $user_name = '';
-
-    // Revisa si el nombre y contraseña están en su lista
-    foreach ($usuarios as $user) {
-        if ($user['username'] === $username && $user['password'] === $password) {
-            $authenticated = true;
-            $user_name = $user['username'];
-            break;
-        }
-    }
-
-    if ($authenticated) {
-        //Fabrica la llave Digital, codifica el nombre y la hora actual
-        $token_data = [
-            'username' => $user_name,
-            'iat' => time() 
-        ];
-        $token = base64_encode(json_encode($token_data)); 
-        // Respuesta exitosa con el token
-        http_response_code(200);
-        echo json_encode([
-            "message" => "Login exitoso",
-            "token" => $token
-        ]);
-    } else {
-        // Código de error 401 Unauthorized (Requisito)
-        send_error(401, "Credenciales incorrectas. Acceso no autorizado."); 
-    }
-}
-
-// Si la pagina pide entrar a la BD (GET/ api/welcome)
-elseif ($_SERVER['REQUEST_METHOD'] === 'GET' && strpos($request_uri, '/api/welcome') !== false) {
-    $token = get_token_from_header();
-
-    // Verifica si tiene llave, si no dice error
-    if (!$token) {
-        // Código de error 403 Forbidden si no hay token (Requisito)
-        send_error(403, "Se requiere un token de autenticación para acceder a este recurso.");
-    }
-
-    // Si tiene la llave, la decodifica y revisa si es válida
-    $decoded_data = json_decode(base64_decode($token), true);
-    $is_token_valid = false;
-    $username_from_token = '';
-    //Logica para ver si la llave es válida
-    if (is_array($decoded_data) && isset($decoded_data['username'])) {
-        $username_from_token = $decoded_data['username'];
+    if (isset($data->username) && isset($data->password)) {
         $found = false;
         foreach ($usuarios as $user) {
-            if ($user['username'] === $username_from_token) {
-                $found = true; 
+            if ($user['username'] === $data->username && $user['password'] === $data->password) {
+                // Generar un token simple (simulación JWT)
+                $payload = json_encode(['username' => $user['username'], 'exp' => time() + 3600]); // Expira en 1 hora
+                $token = base64_encode($payload);
+                
+                http_response_code(200);
+                echo json_encode(["message" => "Autenticación exitosa.", "token" => $token]);
+                $found = true;
                 break;
             }
         }
-        if ($found) {
-            $is_token_valid = true;
+
+        if (!$found) {
+            // 401 Unauthorized
+            http_response_code(401);
+            echo json_encode(["message" => "Credenciales incorrectas."]);
         }
+    } else {
+        http_response_code(400); // Bad Request
+        echo json_encode(["message" => "Faltan credenciales."]);
     }
-    //Si la llave no sirve da error
-    if (!$is_token_valid) {
-        send_error(403, "Token inválido o no reconocido. Acceso prohibido.");
-    }
-
-    // Si la llave es correcta da OK y devuelve los datos
-    http_response_code(200);
-    echo json_encode([
-        "message" => "Datos de bienvenida obtenidos con éxito.",
-        "username" => $username_from_token,
-        "time" => date("H:i:s"), // La hora actual (Requisito)
-        "welcome_message" => "¡Has accedido al sistema con tu token de seguridad!"
-    ]);
+    exit();
 }
 
-//Si piden algo que no está en la lista de tareas
-else {
+// ===============================================
+// ENDPOINT: /api/welcome (GET - PROTEGIDO)
+// ===============================================
+if ($endpoint === 'welcome' && $request_method === 'GET') {
+    $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+
+    // 1. Verificar si el token está presente
+    if (preg_match('/Bearer\s(\S+)/', $auth_header, $matches)) {
+        $token = $matches[1];
+        
+        // 2. Decodificar y validar el token
+        $payload = base64_decode($token);
+        $data = json_decode($payload, true);
+
+        if (isset($data['username']) && isset($data['exp']) && $data['exp'] > time()) {
+            // Token es válido y no ha expirado
+            $current_user = null;
+            foreach ($usuarios as $user) {
+                if ($user['username'] === $data['username']) {
+                    $current_user = $user;
+                    break;
+                }
+            }
+            
+            if ($current_user) {
+                http_response_code(200);
+                echo json_encode([
+                    "message" => "Datos del usuario obtenidos con éxito.", 
+                    "user" => [
+                        "name" => $current_user['name'],
+                        "current_time" => date("H:i:s")
+                    ]
+                ]);
+            } else {
+                // 403 Forbidden (Token válido, pero usuario no encontrado)
+                http_response_code(403);
+                echo json_encode(["message" => "Token de usuario no válido."]);
+            }
+
+        } else {
+            // 403 Forbidden (Token expirado o inválido)
+            http_response_code(403);
+            echo json_encode(["message" => "Token de autenticación expirado o inválido."]);
+        }
+    } else {
+        // 403 Forbidden (Token no proporcionado)
+        http_response_code(403);
+        echo json_encode(["message" => "No se proporcionó token de autenticación."]);
+    }
+    exit();
+}
+
+// Si no coincide ninguna ruta API
+if (strpos($uri, 'api/') !== false) {
     http_response_code(404);
-    echo json_encode(["message" => "Ruta de API no encontrada."]);
+    echo json_encode(["message" => "Ruta API no encontrada."]);
+    exit();
 }
+// NOTA: Para que este script funcione como un router simple, 
+// podrías necesitar configurar .htaccess si estás usando Apache,
+// o configurar las rutas directamente en tu servidor web.
+// Por ejemplo, para Apache, un archivo .htaccess simple podría ser:
+// RewriteEngine On
+// RewriteRule ^api/([a-zA-Z0-9_/]+)$ index.php [QSA,L]
 ?>
